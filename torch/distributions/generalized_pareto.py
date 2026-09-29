@@ -76,7 +76,9 @@ class GeneralizedPareto(Distribution):
         if self._validate_args:
             self._validate_sample(value)
         z = self._z(value)
-        eq_zero = torch.isclose(self.concentration, torch.tensor(0.0))
+        eq_zero = torch.isclose(
+            self.concentration, torch.zeros_like(self.concentration)
+        )
         safe_conc = torch.where(
             eq_zero, torch.ones_like(self.concentration), self.concentration
         )
@@ -91,7 +93,9 @@ class GeneralizedPareto(Distribution):
         if self._validate_args:
             self._validate_sample(value)
         z = self._z(value)
-        eq_zero = torch.isclose(self.concentration, torch.tensor(0.0))
+        eq_zero = torch.isclose(
+            self.concentration, torch.zeros_like(self.concentration)
+        )
         safe_conc = torch.where(
             eq_zero, torch.ones_like(self.concentration), self.concentration
         )
@@ -140,7 +144,12 @@ class GeneralizedPareto(Distribution):
 
     @property
     def mode(self):
-        return self.loc
+        # For concentration < -1 the density grows towards the upper end of the support.
+        return torch.where(
+            self.concentration < -1,
+            self.loc - self.scale / self.concentration,
+            self.loc,
+        )
 
     @constraints.dependent_property(is_discrete=False, event_dim=0)
     # pyrefly: ignore [bad-override]

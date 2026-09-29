@@ -3758,6 +3758,37 @@ class TestDistributions(DistributionsTestCase):
         self._check_log_prob(GeneralizedPareto(loc, scale, concentration), ref_log_prob)
 
     @unittest.skipIf(not TEST_NUMPY, "NumPy not found")
+    def test_generalized_pareto_param_dtype_differs_from_default(self):
+        # Parameters in a dtype other than the default dtype must still be scorable.
+        other = (
+            torch.float32 if torch.get_default_dtype() == torch.double else torch.double
+        )
+        loc = torch.tensor(0.0, dtype=other)
+        scale = torch.tensor(1.0, dtype=other)
+        x = torch.tensor(0.5, dtype=other)
+        for c in (0.3, -0.5, 0.0):
+            d = GeneralizedPareto(loc, scale, torch.tensor(c, dtype=other))
+            self.assertEqual(
+                d.log_prob(x).item(),
+                scipy.stats.genpareto.logpdf(0.5, c),
+                rtol=1e-5,
+                atol=0,
+            )
+            self.assertEqual(
+                d.cdf(x).item(), scipy.stats.genpareto.cdf(0.5, c), rtol=1e-5, atol=0
+            )
+
+    def test_generalized_pareto_mode(self):
+        # For concentration < -1 the density is maximal at the upper end of the support.
+        loc = torch.tensor([0.5, 0.5, 0.5])
+        scale = torch.tensor([2.0, 2.0, 2.0])
+        concentration = torch.tensor([-1.5, -0.5, 0.3])
+        self.assertEqual(
+            GeneralizedPareto(loc, scale, concentration).mode,
+            torch.tensor([0.5 + 2.0 / 1.5, 0.5, 0.5]),
+        )
+
+    @unittest.skipIf(not TEST_NUMPY, "NumPy not found")
     def test_generalized_pareto_sample(self):
         set_rng_seed(1)  # see note [Randomized statistical tests]
         for loc, scale, concentration in product(
