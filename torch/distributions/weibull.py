@@ -1,7 +1,7 @@
 # mypy: allow-untyped-defs
 
 import torch
-from torch import Tensor
+from torch import nan, Tensor
 from torch.distributions import constraints
 from torch.distributions.exponential import Exponential
 from torch.distributions.gumbel import euler_constant
@@ -75,11 +75,11 @@ class Weibull(TransformedDistribution):
 
     @property
     def mode(self) -> Tensor:
-        return (
-            self.scale
-            * ((self.concentration - 1) / self.concentration)
-            ** self.concentration.reciprocal()
-        )
+        # The density is unbounded at 0 for concentration < 1, so the mode is undefined.
+        c = self.concentration
+        safe_c = torch.where(c < 1, torch.ones_like(c), c)
+        mode = self.scale * ((safe_c - 1) / safe_c) ** safe_c.reciprocal()
+        return torch.where(c < 1, torch.full_like(mode, nan), mode)
 
     @property
     def variance(self) -> Tensor:

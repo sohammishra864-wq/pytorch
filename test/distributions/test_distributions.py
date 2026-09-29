@@ -4679,6 +4679,32 @@ class TestDistributions(DistributionsTestCase):
         ordering = (delta > -1e-12).all(axis=0)
         self.assertTrue(ordering[batch_isfinite].all())
 
+    def test_weibull_mode(self):
+        # The mode is undefined for concentration < 1 (density unbounded at 0).
+        scale = torch.tensor(2.0, dtype=torch.double)
+        for concentration in (0.2, 0.25, 0.5, 0.7):
+            self.assertTrue(
+                Weibull(scale, torch.tensor(concentration, dtype=torch.double))
+                .mode.isnan()
+                .item()
+            )
+        concentration = torch.tensor([1.0, 1.5, 3.0], dtype=torch.double)
+        expected = scale * ((concentration - 1) / concentration) ** (1 / concentration)
+        self.assertEqual(Weibull(scale, concentration).mode, expected)
+
+        scale = torch.tensor(2.0, requires_grad=True)
+        Weibull(scale, torch.tensor([0.5, 2.0])).mode.nansum().backward()
+        self.assertTrue(scale.grad.isfinite().item())
+
+    def test_kumaraswamy_mode(self):
+        a = torch.tensor([2.0, 5.0, 1.5], dtype=torch.double)
+        b = torch.tensor([3.0, 1.5, 1.2], dtype=torch.double)
+        expected = ((a - 1) / (a * b - 1)) ** (1 / a)
+        self.assertEqual(Kumaraswamy(a, b).mode, expected)
+        self.assertTrue(
+            Kumaraswamy(torch.tensor(0.5), torch.tensor(2.0)).mode.isnan().item()
+        )
+
     @expectedFailureMPS
     @set_default_dtype_if_supported(torch.double)
     def test_mode(self):
