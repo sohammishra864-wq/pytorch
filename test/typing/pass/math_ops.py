@@ -346,3 +346,6 @@ g = torch.tensor([3, 2, 1])
 torch.xlogy(f, g)
 torch.xlogy(f, 4)
 torch.xlogy(2, g)
+
+# requires_grad_
+a.requires_grad_(requires_grad=False)
