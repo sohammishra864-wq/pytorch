@@ -3609,6 +3609,27 @@ class TestDistributions(DistributionsTestCase):
 
         self._check_log_prob(Laplace(loc, scale), ref_log_prob)
 
+    def test_laplace_cdf_icdf_grad_at_median(self):
+        loc = torch.tensor(0.3, dtype=torch.double, requires_grad=True)
+        scale = torch.tensor(2.0, dtype=torch.double)
+        value = torch.tensor(0.3, dtype=torch.double, requires_grad=True)
+        Laplace(loc, scale).cdf(value).backward()
+        self.assertEqual(value.grad, 1 / (2 * scale))
+        self.assertEqual(loc.grad, -1 / (2 * scale))
+
+        p = torch.tensor(0.5, dtype=torch.double, requires_grad=True)
+        Laplace(loc.detach(), scale).icdf(p).backward()
+        self.assertEqual(p.grad, 2 * scale)
+
+        d = Laplace(loc.detach(), scale)
+        x = torch.tensor([-3.0, 0.3, 5.0], dtype=torch.double, requires_grad=True)
+        gradcheck(d.cdf, (x,), raise_exception=True)
+        q = torch.tensor([0.1, 0.5, 0.9], dtype=torch.double, requires_grad=True)
+        gradcheck(d.icdf, (q,), raise_exception=True)
+        tails = torch.tensor([-2000.0, 2000.0], dtype=torch.double, requires_grad=True)
+        d.cdf(tails).sum().backward()
+        self.assertTrue(tails.grad.isfinite().all().item())
+
     @unittest.skipIf(not TEST_NUMPY, "NumPy not found")
     @set_default_dtype_if_supported(torch.double)
     def test_laplace_sample(self):

@@ -92,13 +92,21 @@ class Laplace(Distribution):
     def cdf(self, value):
         if self._validate_args:
             self._validate_sample(value)
-        return 0.5 - 0.5 * (value - self.loc).sign() * torch.expm1(
-            -(value - self.loc).abs() / self.scale
-        )
+        # Branch with where instead of sign() so the gradient is correct at the median.
+        z = (value - self.loc) / self.scale
+        neg = z < 0
+        # Keep the unused branch finite so it cannot produce nan gradients.
+        z_neg = torch.where(neg, z, 0.0)
+        z_pos = torch.where(neg, 0.0, z)
+        return torch.where(neg, 0.5 * z_neg.exp(), 0.5 - 0.5 * torch.expm1(-z_pos))
 
     def icdf(self, value):
         term = value - 0.5
-        return self.loc - self.scale * (term).sign() * torch.log1p(-2 * term.abs())
+        return torch.where(
+            term < 0,
+            self.loc + self.scale * torch.log1p(2 * term),
+            self.loc - self.scale * torch.log1p(-2 * term),
+        )
 
     def entropy(self):
         return 1 + torch.log(2 * self.scale)
